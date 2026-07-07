@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% from "_macros.html" import csrf_field with context %}
+
+{% block title %}Worldpay Settings{% endblock %}
+
+{% block content %}
+<h1>Worldpay Payments</h1>
+
+<div class="card">
+    <h2>Configuration</h2>
+    <form method="post" action="/admin/payments/worldpay/save" class="form">
+        {{ csrf_field() }}
+        <div class="form-group">
+            <label for="username">API Username</label>
+            <input type="password" id="username" name="username"
+                   value="{{ config.get('username', '') }}" />
+        </div>
+        <div class="form-group">
+            <label for="password">API Password</label>
+            <input type="password" id="password" name="password"
+                   value="{{ config.get('password', '') }}" />
+        </div>
+        <div class="form-group">
+            <label for="webhook_secret">Webhook Secret</label>
+            <input type="password" id="webhook_secret" name="webhook_secret"
+                   value="{{ config.get('webhook_secret', '') }}" />
+        </div>
+        <div class="form-group">
+            <label for="merchant_entity">Merchant Entity ID</label>
+            <input type="text" id="merchant_entity" name="merchant_entity"
+                   value="{{ config.get('merchant_entity', '') }}" />
+        </div>
+        <div class="alert alert--info" style="margin-bottom:1em;">
+            Checkout redirects use your <a href="/admin/settings">Site URL</a> automatically.
+            Clear the override field below to use automatic URLs.
+        </div>
+        <details style="margin-bottom:1em;">
+            <summary>Advanced redirect URL override</summary>
+            <div class="form-group" style="margin-top:1em;">
+                <label for="return_url">Return URL override</label>
+                <input type="text" id="return_url" name="return_url"
+                       value="{{ config.get('return_url', '') }}"
+                       placeholder="Leave blank for automatic URL" />
+            </div>
+        </details>
+        <div class="form-group">
+            <label>
+                <input type="checkbox" name="is_enabled" {% if addon and addon.is_enabled %}checked{% endif %} />
+                Enable this payment processor
+            </label>
+        </div>
+        <div class="form-actions">
+            <button type="submit" class="btn btn--primary">Save Configuration</button>
+        </div>
+    </form>
+</div>
+
+<div class="card" style="margin-top:1.5em;">
+    <h2>Webhook Endpoint</h2>
+    <code>{{ request.base_url }}api/v1/payments/worldpay/webhook</code>
+</div>
+{% endblock %}
