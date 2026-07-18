@@ -13,8 +13,16 @@ import httpx
 from fastapi import APIRouter
 from pydantic import BaseModel, Field, SecretStr
 
+from typing import Mapping
+
 from app.addons.payments.base import PaymentAddon
-from app.addons.payments.helpers import effective_redirect_url, extract_order_id, mock_checkout
+from app.addons.payments.helpers import (
+    create_payment_error,
+    effective_redirect_url,
+    extract_order_id,
+    mock_checkout,
+    verify_paid_via_refetch,
+)
 from schemas.payment import PaymentWebhookOutcome
 from app.addons.log import info, warning
 from app.addons.config_serialization import dump_addon_config
@@ -170,7 +178,7 @@ class WorldpayAddon(PaymentAddon):
             }
         except Exception as exc:
             warning("Worldpay", "create_payment error: {}", exc)
-            return mock_checkout("worldpay", order_id, amount, currency)
+            return create_payment_error("worldpay", exc, order_id)
 
     async def confirm_payment(self, payment_id: str) -> Dict[str, Any]:
         status = await self.get_payment_status(payment_id)
@@ -228,6 +236,29 @@ class WorldpayAddon(PaymentAddon):
         except Exception as exc:
             warning("Worldpay", "get_payment_status({}) error: {}", payment_id, exc)
             return {"payment_id": payment_id, "status": "error", "detail": str(exc)}
+
+    async def verify_webhook(
+        self,
+        *,
+        headers: Mapping[str, str],
+        body: bytes,
+    ) -> bool:
+        """Verify a Worldpay webhook by re-fetching the referenced payment."""
+        del headers
+        import json
+
+        try:
+            payload = json.loads(body.decode("utf-8"))
+        except Exception:
+            return False
+        outcome = await self.parse_webhook(payload, "")
+        if not outcome.mark_paid:
+            return outcome.handled
+        return await verify_paid_via_refetch(
+            self.get_payment_status,
+            outcome.payment_id or "",
+            {"authorized", "captured", "success"},
+        )
 
     async def parse_webhook(
         self, payload: Dict[str, Any], signature: str
